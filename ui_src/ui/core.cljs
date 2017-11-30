@@ -33,7 +33,7 @@
 (defonce buddies (atom []))    
 
 ;; Some test data for the buddy list
-(reset! buddies [{:username "antsonapssalmtree" :group "Buddies" :status "online"}
+(reset! buddies [{:username "antsonapalmtree" :group "Buddies" :status "online"}
                  {:username "jakeman" :group "Buddies" :status "online"} 
                  {:username "ryaz" :group "Buddies" :status "online"} 
                  {:username "YUKI HIMEKAWA" :group "Buddies" :status "online"} 
@@ -138,8 +138,8 @@
 
 (defn buddy [username]
   [:div.buddy
-    [:img.opendoor {:src "img/opendoor.png"}]              
-    [:img.closedoor {:src "img/closedoor.png"}]   
+    [:img.opendoor {:src "img/opendoor.png" :id (str username "opendoor")}]              
+    [:img.closedoor {:src "img/closedoor.png" :id (str username "closedoor")}]   
     [:a {:on-click #((open-chat-ipc username))} username]])    
 
 (defn buddy-group [group-name]
@@ -162,7 +162,8 @@
         [:div.buddy-list
           [:div.inner-buddy-list
             [buddy-group "Buddies"]
-            [buddy-group "Family"]]]]]])
+            [buddy-group "Family"]
+            [buddy-group "Co-Workers"]]]]]])
 
 (defn render-buddy-list-window []  
   (reagent/render

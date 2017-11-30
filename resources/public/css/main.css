@@ -288,10 +288,31 @@ audio {
 }
 
 details {
+  font-size: 16px;
+  font-family: sans-serif;
   padding: 5px;
+}
+
+summary {
+  font-weight: bold;
+}
+
+.buddy {
+  font-weight: normal;
 }
 
 details > a {
   padding-left: 25px;
 }
 
+.buddy > img {
+  display: inline-block;
+  position: relative;
+  right: 5px;
+  visibility: hidden;
+}
+
+.opendoor {
+  position: relative;
+  left: 10px;
+}
