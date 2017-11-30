@@ -9,6 +9,9 @@
 (def title (.-title (.-meta (.-browserWindowOptions (.-webContents (.getCurrentWindow remote))))))
 (def metadata (.-meta (.-browserWindowOptions (.-webContents (.getCurrentWindow remote)))))
 (def this (.getCurrentWindow remote))
+(def root (js/document.getElementById "container"))
+
+
 
 ; (defn now [] "date")
 (defn now [] 
@@ -27,6 +30,19 @@
 (enable-console-print!)
 
 (defonce chat (atom []))    
+(defonce buddies (atom []))    
+
+;; Some test data for the buddy list
+(reset! buddies [{:username "antsonapssalmtree" :group "Buddies" :status "online"}
+                 {:username "jakeman" :group "Buddies" :status "online"} 
+                 {:username "ryaz" :group "Buddies" :status "online"} 
+                 {:username "YUKI HIMEKAWA" :group "Buddies" :status "online"} 
+                 {:username "nice" :group "Family" :status "online"} 
+                 {:username "sachiko" :group "Buddies" :status "online"} 
+                 {:username "feleap" :group "Co-Workers" :status "online"} 
+                 {:username "akari" :group "Buddies" :status "offline"}
+                 {:username "ritz" :group "Buddies" :status "offline"}])
+
 
 (defn open-chat-ipc [username]
   (.sendSync ipc "open-chat" (clj->js {:username username})))
@@ -119,6 +135,22 @@
   [:div.buddy-list-logo
     [:img {:src "https://puu.sh/yvB46/41b59ba73e.jpg"}]])
 
+
+(defn buddy [username]
+  [:div.buddy
+    [:img.opendoor {:src "img/opendoor.png"}]              
+    [:img.closedoor {:src "img/closedoor.png"}]   
+    [:a {:on-click #((open-chat-ipc username))} username]])    
+
+(defn buddy-group [group-name]
+  (let [filtered-buddies 
+        (filter #(and (not= "offline" (:status %)) (= group-name (:group %))) @buddies)]
+    [:details
+      [:summary group-name
+       (for [{:keys [username]} filtered-buddies]
+        [buddy username])]]))
+
+
 (defn buddy-list []
   [:div.buddy-list-container
     [:div.online
@@ -129,22 +161,10 @@
       [:div.inner-buddy-window
         [:div.buddy-list
           [:div.inner-buddy-list
-            [:details.buddies 
-              [:summary "Buddies"]
-              [:a {:on-click #((open-chat-ipc "antsonapalmtree"))} "antsonapalmtree"]]
-            [:details.family 
-              [:summary "Family"]
-              [:a "ur mom"]]
-            [:details.buddies 
-              [:summary "Co-Workers"]
-              [:a "feleap"]]
-            [:details.offline 
-              [:summary "Offline"]
-              [:a "uncool people"]]]]]]])
-            
+            [buddy-group "Buddies"]
+            [buddy-group "Family"]]]]]])
 
-
-(if-let [root (js/document.getElementById "app-container")]
+(defn render-buddy-list-window []  
   (reagent/render
     [:div.window 
       [:div.inner-window
@@ -152,10 +172,8 @@
         [menu-bar]
         [buddy-list-logo]
         [buddy-list]]]
-    root))
-
-
-(if-let [root (js/document.getElementById "chat-window")]
+    root))  
+(defn render-chat-window []
   (reagent/render
     [:div.window
       [:div.inner-window
@@ -164,6 +182,13 @@
         [text-in]
         [chat-sounds]]]
     root))
-       
+(defn render-login-window [])
+(defn render-dialup-splash-window [])
 
+(log metadata)
+(case (.-class metadata) 
+  "dialup-splash" (render-dialup-splash-window)
+  "chat" (render-chat-window)
+  "login" (render-login-window)
+  "buddy-list" (render-buddy-list-window))
 ; (.log js/console electron)
