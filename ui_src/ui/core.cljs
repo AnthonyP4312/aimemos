@@ -1,7 +1,8 @@
 (ns ui.core
   (:require [reagent.core :as reagent :refer [atom]]
             [reagent.format :refer [format]]
-            [clojure.string :as string :refer [split-lines]]))
+            [clojure.string :as string :refer [split-lines]]
+            [clojure.set :refer [difference union intersection select]]))
 
 (def electron (js/require "electron"))
 (def remote (.-remote electron))
@@ -25,23 +26,24 @@
 (defn by-id [id] (js/document.getElementById id))
 (defn log [message] (js/console.log message))
 
+
 (def join-lines (partial string/join "\n"))
 
 (enable-console-print!)
 
 (defonce chat (atom []))    
-(defonce buddies (atom []))    
+(defonce buddies (atom #{}))    
 
 ;; Some test data for the buddy list
-(reset! buddies [{:username "antsonapalmtree" :group "Buddies" :status "online"}
-                 {:username "jakeman" :group "Buddies" :status "online"} 
-                 {:username "ryaz" :group "Buddies" :status "online"} 
-                 {:username "YUKI HIMEKAWA" :group "Buddies" :status "online"} 
-                 {:username "nice" :group "Family" :status "online"} 
-                 {:username "sachiko" :group "Buddies" :status "online"} 
-                 {:username "feleap" :group "Co-Workers" :status "online"} 
-                 {:username "akari" :group "Buddies" :status "offline"}
-                 {:username "ritz" :group "Buddies" :status "offline"}])
+(reset! buddies #{{:id 1 :username "antsonapalmtree" :group "Buddies" :status "online"}
+                  {:id 2 :username "jakeman" :group "Buddies" :status "online"} 
+                  {:id 3 :username "ryaz" :group "Buddies" :status "online"} 
+                  {:id 4 :username "YUKI HIMEKAWA" :group "Buddies" :status "online"} 
+                  {:id 5 :username "nice" :group "Family" :status "online"} 
+                  {:id 6 :username "sachiko" :group "Buddies" :status "online"} 
+                  {:id 7 :username "feleap" :group "Co-Workers" :status "online"} 
+                  {:id 8 :username "akari" :group "Buddies" :status "offline"}
+                  {:id 9 :username "ritz" :group "Buddies" :status "offline"}})
 
 
 (defn open-chat-ipc [username]
@@ -98,6 +100,37 @@
     (swap! chat conj {:id (.now js/Date) :ts (now) :author "author" :message message})
     (set! (.-value (by-id "text-in")) "")))
     
+(defn away-effect [username])
+
+(defn ^:export logout-effect [username]  
+  (.play (by-id "closedoor"))  
+  (js/setTimeout
+    #(set! (.-visibility (.-style (by-id (str username "closedoor")))) "visible")
+    20)
+  (js/setTimeout 
+    #(set! (.-visibility (.-style (by-id (str username "closedoor")))) "hidden")
+    5000))  
+
+(defn ^:export login-effect [username]
+  (.play (by-id "opendoor"))  
+  (js/setTimeout
+    #(set! (.-visibility (.-style (by-id (str username "opendoor")))) "visible")
+    20)
+  (js/setTimeout 
+    #(set! (.-visibility (.-style (by-id (str username "opendoor")))) "hidden")
+    5000))
+
+(defn buddy-change-status [user status]
+  (reset! buddies (-> (difference @buddies user)
+                      (conj ,,, (assoc user :status status))))  
+  (case status                        
+    "online" (login-effect (:username user))
+    "offline" (logout-effect (:username user))
+    "away" (away-effect (:username user))))
+
+  
+
+
 (defn text-in []
  [:div.outer-text-in 
   [:textarea#text-in {:on-key-press 
@@ -143,12 +176,20 @@
     [:a {:on-click #((open-chat-ipc username))} username]])    
 
 (defn buddy-group [group-name]
-  (let [filtered-buddies 
-        (filter #(and (not= "offline" (:status %)) (= group-name (:group %))) @buddies)]
+  (let [filtered-buddies (filter #(= group-name (:group %)) @buddies)
+        online-buddies (filter #(not= "offline" (:status %)) filtered-buddies)]
     [:details
-      [:summary group-name
-       (for [{:keys [username]} filtered-buddies]
-        [buddy username])]]))
+      [:summary (str group-name " ( " (count online-buddies) "/" (count filtered-buddies) " )")]
+      (for [{:keys [username]} filtered-buddies]
+       [buddy username])]))
+
+
+(defn offline-buddies []
+  (let [filtered-buddies (filter #(= "offline" (:status %)) @buddies)]        
+    [:details.offline
+      [:summary (str "Offline ( " (count filtered-buddies) "/" (count @buddies) " )")]
+      (for [{:keys [username]} filtered-buddies]
+       [buddy username])]))
 
 
 (defn buddy-list []
@@ -163,12 +204,14 @@
           [:div.inner-buddy-list
             [buddy-group "Buddies"]
             [buddy-group "Family"]
-            [buddy-group "Co-Workers"]]]]]])
+            [buddy-group "Co-Workers"]
+            [offline-buddies]]]]]])
 
 (defn render-buddy-list-window []  
   (reagent/render
     [:div.window 
       [:div.inner-window
+        [buddy-sounds]
         [window-heading (str "Buddy List")]
         [menu-bar]
         [buddy-list-logo]

@@ -32,7 +32,7 @@
                         :resizable true
                         :titleBarStyle "hidden"}))]
     (.log js/console chat.webContents)                        
-    (.loadURL chat (str "file://" js/__dirname "/public/chat.html"))
+    (.loadURL chat (str "file://" js/__dirname "/public/index.html"))
     (swap! chat-windows conj chat)))
 
 (.on ipc "open-chat" (fn [event, info]

@@ -11,7 +11,8 @@
                  [reagent-utils "0.2.1"]]
   :plugins [[lein-cljsbuild "1.1.5"]
             [lein-figwheel "0.5.10"]
-            [lein-cooper "1.2.2"]]
+            [lein-cooper "1.2.2"]
+            [lein-kibit "0.1.5"]]
 
   :clean-targets ^{:protect false} ["resources/main.js"
                                     "resources/public/js/ui-core.js"

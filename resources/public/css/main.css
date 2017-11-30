@@ -138,7 +138,7 @@ body {
 }
 
 audio {
-  visibility: hidden;
+  display: none;
 }
 
 .menu-bar {
@@ -315,4 +315,12 @@ details > a {
 .opendoor {
   position: relative;
   left: 10px;
+}
+
+.offline {
+  color: gray;
+}
+
+.offline > summary {
+  font-weight: lighter;
 }
