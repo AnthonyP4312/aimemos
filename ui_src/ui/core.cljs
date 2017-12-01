@@ -43,11 +43,20 @@
                   {:id 6 :username "sachiko" :group "Buddies" :status "online"} 
                   {:id 7 :username "feleap" :group "Co-Workers" :status "online"} 
                   {:id 8 :username "akari" :group "Buddies" :status "offline"}
-                  {:id 9 :username "ritz" :group "Buddies" :status "offline"}})
+                  {:id 9 :username "binaryman" :group "Buddies" :status "offline"}})
 
 
 (defn open-chat-ipc [username]
   (.sendSync ipc "open-chat" (clj->js {:username username})))
+
+(defn open-buddy-list-ipc [meta]
+  (.sendSync ipc "open-buddy-list" (clj->js meta)))
+
+(defn open-login-window-ipc [meta]
+  (.sendSync ipc "open-login-window" (clj->js meta)))
+
+(defn open-dialup-splash-ipc [meta]
+  (.sendSync ipc "open-dialup-splash" (clj->js meta)))
 
 (defn scroll-down [^js/Event e]
   (log "scrolling!")
@@ -69,36 +78,14 @@
 
 (defn help [])
 
-(defn window-heading [title]
-  [:div.title-bar title
-   [:img.title-icon {:src "img/aim.png"}]
-   [:div.title-btn
-    [:input {:on-click minimize-window :type "image" :src "img/min.png" :id "btn-min"}]
-    [:input {:on-click maximize-window :type "image" :src "img/max.png" :id "btn-max"}]
-    [:input {:on-click close-window :type "image" :src "img/close.png" :id "btn-close"}]]])
-
-(defn text-out [chat]
-  (reagent/create-class
-    {:component-did-update scroll-down
-     :reagent-render 
-      (fn [chat]
-        [:div.text-out
-         [:div#text-out.inner-text-out
-          (for [{:keys [id ts author message]} @chat]
-            ^{:key id} [:div {:id id :on-load scroll-down} ;;(reduce + [author " : " message])
-                        [:span.ts (str "[" ts "] ")]  
-                        [:span.screen-name author]
-                        [:span ": "]
-                        [:span#message message]])]])}))
-
 (defn send-message [^js/Event e]
   (log "sending message!!")
   (.preventDefault e)
   (.play (by-id "messageout"))
   (let [ message (.-value (js/document.getElementById "text-in"))]
     ; (.log js/console message)
-    (swap! chat conj {:id (.now js/Date) :ts (now) :author "author" :message message})
-    (set! (.-value (by-id "text-in")) "")))
+    (swap! chat conj {:id (.now js/Date) :ts (now) :author "tanners" :message message})
+    (set! (.-value (js/document.getElementById "text-in")) "")))
     
 (defn away-effect [username])
 
@@ -128,12 +115,72 @@
     "offline" (logout-effect (:username user))
     "away" (away-effect (:username user))))
 
-  
+(defn horizontal-rule [size] 
+  (println size)
+  [:div.horizontal-rule
+    [:div.upper-rule-border {:style {:height size}}]
+    [:div.lower-rule-border {:style {:height size}}]])
 
+(defn window-heading [title]
+  [:div.title-bar title
+   [:img.title-icon {:src "img/aim.png"}]
+   [:div.title-btn
+    [:input {:on-click minimize-window :type "image" :src "img/min.png" :id "btn-min"}]
+    [:input {:on-click maximize-window :type "image" :src "img/max.png" :id "btn-max"}]
+    [:input {:on-click close-window :type "image" :src "img/close.png" :id "btn-close"}]]])
+
+(defn text-out [chat]
+  (reagent/create-class
+    {:component-did-update scroll-down
+     :reagent-render 
+      (fn [chat]
+        [:div.text-out
+         [:div#text-out.inner-text-out
+          (for [{:keys [id ts author message]} @chat]
+            ^{:key id} [:div {:id id :on-load scroll-down} ;;(reduce + [author " : " message])
+                        [:span.ts (str "[" ts "] ")]  
+                        [:span.screen-name author]
+                        [:span ": "]
+                        [:span#message message]])]])}))
+
+(defn text-options []
+  [:div#text-options-container.outer-border
+    [:div.inner-border
+      [:div.text-options
+        [:span.color-picker
+          [:input.options {:type "image" :src "img/font-color.png"}]
+          [:input.options {:type "image" :src "img/font-background-color.png"}]]
+        [:span.text-size
+          [:input.options {:type "image" :src "img/lower.png"}]
+          [:input.options {:type "image" :src "img/reset.png"}]
+          [:input.options {:type "image" :src "img/upper.png"}]]
+        [:span.text-decoration
+          [:input.options {:type "image" :src "img/bold.png"}]
+          [:input.options {:type "image" :src "img/italic.png"}]
+          [:input.options {:type "image" :src "img/underline.png"}]]
+        [:span.insert
+          [:input.options {:type "image" :src "img/hyperlink.png"}]
+          [:input.options {:type "image" :src "img/image.png"}]
+          [:input.options {:type "image" :src "img/email.png"}]
+          [:input.options {:type "image" :src "img/emoji.png"}]]]]])
+      
+(defn chat-buttons [] 
+  [:div#chat-buttons-container.outer-border
+    [:div.inner-border
+      [:div.chat-buttons
+        [:div.warn-block
+          [:input.chat-button {:type "image" :src "img/warn.png"}]
+          [:input.chat-button {:type "image" :src "img/block.png"}]]
+        [:div.buddy-actions
+          [:input.chat-button {:type "image" :src "img/add-buddy.png"}]
+          [:input.chat-button {:type "image" :src "img/talk.png"}]
+          [:input.chat-button {:type "image" :src "img/get-info.png"}]]
+        [:div.send-button
+          [:input.chat-button {:type "image" :src "img/send.png" :on-click send-message}]]]]])
 
 (defn text-in []
  [:div.outer-text-in 
-  [:textarea#text-in {:on-key-press 
+  [:textarea.text-in {:id "text-in" :on-key-press 
                       (fn [e]
                         (log (.-key e))
                         (when-not (.-shiftKey e)
@@ -158,16 +205,16 @@
     [:audio {:id "messagein" :src "sound/messagein.ogg"}]                            
     [:audio {:id "messageout" :src "sound/messageout.ogg"}]])                            
     
-(defn menu-bar []
-  [:div.menu-bar
-    [:button {:id "my-aim" :on-click my-aim} "My AIM"]
-    [:button {:id "people" :on-click people} "People"]
-    [:button {:id "help" :on-click help} "Help"]])
+(defn menu-bar [buttons]
+  [:div.menu-bar-container  
+    [:div.menu-bar
+      (for [text buttons]
+        [:button text])]
+    [:div.menu-bar-border]])    
 
 (defn buddy-list-logo []
   [:div.buddy-list-logo
-    [:img {:src "https://puu.sh/yvB46/41b59ba73e.jpg"}]])
-
+    [:img {:src "img/aimlogo.png"}]])
 
 (defn buddy [username]
   [:div.buddy
@@ -180,9 +227,8 @@
         online-buddies (filter #(not= "offline" (:status %)) filtered-buddies)]
     [:details
       [:summary (str group-name " ( " (count online-buddies) "/" (count filtered-buddies) " )")]
-      (for [{:keys [username]} filtered-buddies]
+      (for [{:keys [username]} online-buddies]
        [buddy username])]))
-
 
 (defn offline-buddies []
   (let [filtered-buddies (filter #(= "offline" (:status %)) @buddies)]        
@@ -190,7 +236,6 @@
       [:summary (str "Offline ( " (count filtered-buddies) "/" (count @buddies) " )")]
       (for [{:keys [username]} filtered-buddies]
        [buddy username])]))
-
 
 (defn buddy-list []
   [:div.buddy-list-container
@@ -207,13 +252,29 @@
             [buddy-group "Co-Workers"]
             [offline-buddies]]]]]])
 
+(defn login-form []
+  [:form.login-form
+    [:div.username-container
+      [:div.username-item {:for "username"} "Screen Name"]
+      [:span#username-border.username-item
+        [:input#username]]]
+    [:div.password-container
+      [:label.password-item {:for "password"} "Password      "]
+      [:span#password-border.password-item
+        [:input#password {:type "password"}]]]])
+    ; [:div.login-checks
+    ;   [:input#save-password {:type "checkbox"}]
+    ;   [:label {:for "save-password"} "Save password"]
+    ;   [:input#auto-login {:type "checkbox"}]
+    ;   [:label {:for "auto-login"} "Auto-login"]]])
+
 (defn render-buddy-list-window []  
   (reagent/render
     [:div.window 
       [:div.inner-window
         [buddy-sounds]
-        [window-heading (str "Buddy List")]
-        [menu-bar]
+        [window-heading (str (.-username metadata) " 's Buddy List")]
+        [menu-bar ["My AIM" "People" "Help"]]
         [buddy-list-logo]
         [buddy-list]]]
     root))  
@@ -222,17 +283,32 @@
     [:div.window
       [:div.inner-window
         [window-heading (str title)]
-        [text-out chat]
-        [text-in]
+        [menu-bar ["File" "Edit" "Insert" "People"]]
+        [:div.chat-container 
+          [text-out chat]
+          [text-options]
+          [text-in]
+          [chat-buttons]]
         [chat-sounds]]]
     root))
-(defn render-login-window [])
+(defn render-login-window []
+  (reagent/render
+    [:div.window
+      [:div.inner-window
+        [window-heading (str title)]
+        [:div.login-container
+          [:img.login-logo {:src "img/login-logo.png"}]
+          [horizontal-rule 3]
+          [login-form]]]]
+          
+    root))
 (defn render-dialup-splash-window [])
 
-(log metadata)
+(println metadata)
+(println title)
 (case (.-class metadata) 
   "dialup-splash" (render-dialup-splash-window)
-  "chat" (render-chat-window)
-  "login" (render-login-window)
+  "chat-window" (render-chat-window)
+  "login-window" (render-login-window)
   "buddy-list" (render-buddy-list-window))
 ; (.log js/console electron)

@@ -12,14 +12,9 @@
 (def chat-windows (atom []))
 
 
-(defn new-window! [window class]
-  (.log js/console window class)
-  (reset! window (browser-window.
-                          (clj->js {:meta {:class class}
-                                    :frame false
-                                    :titleBarStyle "hidden"
-                                    :width 1200
-                                    :height 700})))
+(defn new-window! [window options]
+  (.log js/console window options)
+  (reset! window (browser-window. (clj->js options)))
   (.loadURL @window (str "file://" js/__dirname "/public/index.html"))
   (.on  @window "closed" #(reset! window nil)))
 
@@ -35,13 +30,44 @@
     (.loadURL chat (str "file://" js/__dirname "/public/index.html"))
     (swap! chat-windows conj chat)))
 
-(.on ipc "open-chat" (fn [event, info]
-                        (.log js/console info)
-                        (open-chat-window (.-username info))
-                        (set! (.-returnValue event) "bitch")))
+(.on ipc "open-buddy-list" 
+  (fn [event, meta]
+    (new-window! buddy-list (clj->js {:meta meta
+                                      :frame false
+                                      :titleBarStyle "hidden"
+                                      :width 1200
+                                      :height 700}))
+    (set! (.-returnValue event) "bitch")))
+
+(.on ipc "open-login-window" 
+  (fn [event, meta]
+    (new-window! login-window (clj->js {:meta meta
+                                        :frame false
+                                        :titleBarStyle "hidden"
+                                        :width 1200
+                                        :height 700}))
+    (set! (.-returnValue event) "bitch")))
+
+(.on ipc "open-dialup-splash" 
+  (fn [event, meta]
+    (new-window! dialup-splash (clj->js {:meta meta
+                                         :frame false
+                                         :titleBarStyle "hidden"
+                                         :width 1200
+                                         :height 700}))
+    (set! (.-returnValue event) "bitch")))
+
+(.on ipc "open-chat" 
+  (fn [event, info]
+    (open-chat-window (.-username info))
+    (set! (.-returnValue event) "bitch")))
                         
 
 ; CrashReporter can just be omitted
 (.on app "window-all-closed" #(when-not (= js/process.platform "darwin")
                                 (.quit app)))                        
-(.on app "ready" #(new-window! buddy-list "buddy-list"))
+(.on app "ready" #(new-window! login-window {:meta {:class "login-window" :title "Sign On"}
+                                             :frame false
+                                             :titleBarStyle "hidden"
+                                             :width 1200
+                                             :height 700}))
