@@ -4,10 +4,9 @@ textarea {
   resize: none
 }
 
-/* html {
-    height: 100%;
-    width: 100%;
-} */
+html {
+    font-family: "Arial";
+}
 
 body {
   height: 100%;
@@ -63,6 +62,7 @@ body {
 }
 
 .title-btn {
+  -webkit-app-region: no-drag;
   /* border: 1px solid blue; */
   color: black;
   margin: 1px;
@@ -72,14 +72,15 @@ body {
 }
 
 .title-btn > input {
-  .login-form > -webkit-app-region: no-drag; {
-    float: right;
-  }
   height: 14px;
   width: 16px;
   padding: 0;
   margin-left: 1px;
 }
+/* 
+#btn-close {
+  margin-left: 2px;
+} */
 
 .chat-container {
   margin: 8px 8px 4px;
@@ -513,8 +514,50 @@ label {
 .password-container {
   margin-top: 10px;
   display: flex;
+  margin-bottom: 5px;
 }
 
 .password-item {
   flex-grow: 1;
+}
+
+.left-block {
+  float: left;
+}
+
+.left-buttons > input {
+  margin-top: 10px;
+  width: 50%;
+}
+
+#setup {
+  position: relative;
+  top: 2px;
+}
+
+#sign-on {
+  position: relative;
+  top: 1px;
+}
+
+.right-block {
+  float: right;
+}
+
+.right-buttons > input {
+  width: 100%;
+}
+
+.version {
+  position: fixed;
+  bottom: 10px;
+  width: 100%;
+  text-align: center;
+}
+
+.splash {
+  -webkit-app-region: drag;
+  position: absolute;
+  left: 0;
+  top: 0;
 }

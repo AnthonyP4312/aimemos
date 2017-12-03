@@ -13,39 +13,41 @@
 
 
 (defn new-window! [window options]
-  (.log js/console window options)
   (reset! window (browser-window. (clj->js options)))
   (.loadURL @window (str "file://" js/__dirname "/public/index.html"))
   (.on  @window "closed" #(reset! window nil)))
 
 (defn open-chat-window [screen-name]
   (let [chat (browser-window.
-              (clj->js {:meta {:class "chat" :title screen-name}
+              (clj->js {:icon "img/aim.png"
+                        :meta {:class "chat-window" :title screen-name}
                         :width 500
                         :height 500
                         :frame false
                         :resizable true
-                        :titleBarStyle "hidden"}))]
-    (.log js/console chat.webContents)                        
+                        :titleBarStyle "hidden"}))]                       
     (.loadURL chat (str "file://" js/__dirname "/public/index.html"))
     (swap! chat-windows conj chat)))
 
 (.on ipc "open-buddy-list" 
   (fn [event, meta]
-    (new-window! buddy-list (clj->js {:meta meta
+    (new-window! buddy-list (clj->js {:icon "img/aim.png"
+                                      :meta meta
                                       :frame false
                                       :titleBarStyle "hidden"
-                                      :width 1200
-                                      :height 700}))
+                                      :width 300
+                                      :height 700}))                                     
     (set! (.-returnValue event) "bitch")))
 
 (.on ipc "open-login-window" 
   (fn [event, meta]
-    (new-window! login-window (clj->js {:meta meta
+    (new-window! login-window (clj->js {:meta {:class "login-window"}
                                         :frame false
                                         :titleBarStyle "hidden"
-                                        :width 1200
-                                        :height 700}))
+                                        :width 300
+                                        :height 500
+                                        :icon "img/aim.png"
+                                        :resizable false}))                                       
     (set! (.-returnValue event) "bitch")))
 
 (.on ipc "open-dialup-splash" 
@@ -53,8 +55,9 @@
     (new-window! dialup-splash (clj->js {:meta meta
                                          :frame false
                                          :titleBarStyle "hidden"
-                                         :width 1200
-                                         :height 700}))
+                                         :width 1000
+                                         :icon "img/aim.png"
+                                         :height 475}))
     (set! (.-returnValue event) "bitch")))
 
 (.on ipc "open-chat" 
@@ -66,8 +69,10 @@
 ; CrashReporter can just be omitted
 (.on app "window-all-closed" #(when-not (= js/process.platform "darwin")
                                 (.quit app)))                        
-(.on app "ready" #(new-window! login-window {:meta {:class "login-window" :title "Sign On"}
-                                             :frame false
-                                             :titleBarStyle "hidden"
-                                             :width 1200
-                                             :height 700}))
+(.on app "ready" #(new-window! login-window {:meta {:class "dialup-splash"}
+                                              :frame false
+                                              :titleBarStyle "hidden"
+                                              :resizable false
+                                              :width 910
+                                              :icon "img/aim.png"
+                                              :height 432}))

@@ -78,12 +78,16 @@
 
 (defn help [])
 
+(defn login-help [^js/Event e]
+  (.preventDefault e))
+
+(defn login-setup [^js/Event e]
+  (.preventDefault e))
+
 (defn send-message [^js/Event e]
-  (log "sending message!!")
   (.preventDefault e)
   (.play (by-id "messageout"))
   (let [ message (.-value (js/document.getElementById "text-in"))]
-    ; (.log js/console message)
     (swap! chat conj {:id (.now js/Date) :ts (now) :author "tanners" :message message})
     (set! (.-value (js/document.getElementById "text-in")) "")))
     
@@ -114,6 +118,21 @@
     "online" (login-effect (:username user))
     "offline" (logout-effect (:username user))
     "away" (away-effect (:username user))))
+
+(defn dialup-script []
+  (.play (by-id "dialup"))    
+  (js/setTimeout #(set! (.-src (by-id "splash")) "img/dialup-part2.png") 20506)      
+  (js/setTimeout #(set! (.-src (by-id "splash")) "img/dialup-part3.png") 23012)      
+  (js/setTimeout #(open-login-window-ipc {}) 25500)      
+  (js/setTimeout close-window 26000))      
+
+(defn validate-login [^js/Event e]
+  (open-buddy-list-ipc {:class "buddy-list"
+                        :username (.-value (by-id "username"))})   
+  (close-window))
+  ;; do a http call
+  ;; on code 200 render body
+  ;; on other code render error 
 
 (defn horizontal-rule [size] 
   (println size)
@@ -190,7 +209,7 @@
 
 (defn splash-sounds []
   [:div#splash-sounds
-    [:audio {:id "dialup" :src "sounds/dialup.ogg"}]])
+    [:audio {:id "dialup" :src "sound/dialup.ogg"}]])
 
 (defn buddy-sounds []
   [:div#buddy-sounds
@@ -253,7 +272,7 @@
             [offline-buddies]]]]]])
 
 (defn login-form []
-  [:form.login-form
+  [:form.login-form {:on-submit validate-login}
     [:div.username-container
       [:div.username-item {:for "username"} "Screen Name"]
       [:span#username-border.username-item
@@ -261,12 +280,18 @@
     [:div.password-container
       [:label.password-item {:for "password"} "Password      "]
       [:span#password-border.password-item
-        [:input#password {:type "password"}]]]])
-    ; [:div.login-checks
-    ;   [:input#save-password {:type "checkbox"}]
-    ;   [:label {:for "save-password"} "Save password"]
-    ;   [:input#auto-login {:type "checkbox"}]
-    ;   [:label {:for "auto-login"} "Auto-login"]]])
+        [:input#password {:type "password"}]]]
+    [:div.left-block
+      [:input#save-password {:type "checkbox"}]
+      [:label {:for "save-password"} "Save password"]
+      [:div.left-buttons
+        [:input {:type "image" :id "help" :src "img/help.png" :on-click login-help}]
+        [:input {:type "image" :id "setup" :src "img/setup.png" :on-click login-setup}]]]
+    [:div.right-block
+      [:input#auto-login {:type "checkbox"}]
+      [:label {:for "auto-login"} "Auto-login"]
+      [:div.right-buttons
+        [:input {:type "image" :id "sign-on" :src "img/sign-on.png"}]]]])
 
 (defn render-buddy-list-window []  
   (reagent/render
@@ -295,14 +320,20 @@
   (reagent/render
     [:div.window
       [:div.inner-window
-        [window-heading (str title)]
+        [window-heading "Sign On"]
         [:div.login-container
           [:img.login-logo {:src "img/login-logo.png"}]
           [horizontal-rule 3]
-          [login-form]]]]
-          
+          [login-form]]
+        [:div.version "Version: 0.0.1"]]]
     root))
-(defn render-dialup-splash-window [])
+(defn render-dialup-splash-window []
+  (reagent/render 
+    [:div.splash-container
+      [splash-sounds]
+      [:img.splash {:id "splash" :src "img/dialup-part1.png" :on-load dialup-script}]]
+    root))
+  
 
 (println metadata)
 (println title)
@@ -311,4 +342,3 @@
   "chat-window" (render-chat-window)
   "login-window" (render-login-window)
   "buddy-list" (render-buddy-list-window))
-; (.log js/console electron)
