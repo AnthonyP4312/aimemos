@@ -1,5 +1,11 @@
 {
   "name": "hello-world",
   "version": "0.1.0",
-  "main": "resources/main.js"
+  "main": "resources/main.js",
+  "dependencies": {
+    "debug": "^3.1.0",
+    "electron": "^1.7.9",
+    "socket.io": "^2.0.4",
+    "websocket": "^1.0.25"
+  }
 }

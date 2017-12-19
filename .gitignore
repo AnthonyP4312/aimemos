@@ -4,3 +4,5 @@ resources/main.js
 *-init.clj
 figwheel_server.log
 .lein-repl-history
+node_modules
+package-lock.json

@@ -1,10 +1,15 @@
 (ns ui.core
+  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
   (:require [reagent.core :as reagent :refer [atom]]
             [reagent.format :refer [format]]
+            [cljs-http.client :as http]
+            [cljs.core.async :refer [<! >! put! chan]]
             [clojure.string :as string :refer [split-lines]]
             [clojure.set :refer [difference union intersection select]]))
 
 (def electron (js/require "electron"))
+(def io (js/require "socket.io-client"))
+(def wsClient (.-client (js/require "websocket")))
 (def remote (.-remote electron))
 (def ipc (.-ipcRenderer electron))
 (def title (.-title (.-meta (.-browserWindowOptions (.-webContents (.getCurrentWindow remote))))))
@@ -25,26 +30,44 @@
                              
 (defn by-id [id] (js/document.getElementById id))
 (defn log [message] (js/console.log message))
-
+(defn stringify
+  "Takes a clojure map, returns a Stringified json object"
+  [clj-map]
+  (js/JSON.stringify (clj->js clj-map)))
 
 (def join-lines (partial string/join "\n"))
 
 (enable-console-print!)
 
 (defonce chat (atom []))    
-(defonce buddies (atom #{}))    
+(defonce buddies (atom ()))    
+(defonce ws (atom {}))
 
 ;; Some test data for the buddy list
-(reset! buddies #{{:id 1 :username "antsonapalmtree" :group "Buddies" :status "online"}
-                  {:id 2 :username "jakeman" :group "Buddies" :status "online"} 
-                  {:id 3 :username "ryaz" :group "Buddies" :status "online"} 
-                  {:id 4 :username "YUKI HIMEKAWA" :group "Buddies" :status "online"} 
-                  {:id 5 :username "nice" :group "Family" :status "online"} 
-                  {:id 6 :username "sachiko" :group "Buddies" :status "online"} 
-                  {:id 7 :username "feleap" :group "Co-Workers" :status "online"} 
-                  {:id 8 :username "akari" :group "Buddies" :status "offline"}
-                  {:id 9 :username "binaryman" :group "Buddies" :status "offline"}})
+;; (reset! buddies #{{:id 1 :username "antsonapalmtree" :group-name "Buddies" :status "online"}
+;;                   {:id 2 :username "jakeman" :group-name "Buddies" :status "online"} 
+;;                   {:id 3 :username "ryaz" :group-name "Buddies" :status "online"} 
+;;                   {:id 4 :username "YUKI HIMEKAWA" :group-name "Buddies" :status "online"} 
+;;                   {:id 5 :username "nice" :group-name "Family" :status "online"} 
+;;                   {:id 6 :username "sachiko" :group-name "Buddies" :status "online"} 
+;;                   {:id 7 :username "feleap" :group-name "Co-Workers" :status "online"} 
+;;                   {:id 8 :username "akari" :group-name "Buddies" :status "offline"}
+;;                   {:id 9 :username "binaryman" :group-name "Buddies" :status "offline"}})
 
+
+(reset! buddies (js->clj (.-buddies metadata) :keywordize-keys true))
+
+
+(defn group-list
+  "returns a set of all groups in a buddylist"
+  [buddies]
+  (set (map #(:groupname %) buddies)))
+
+(defn create-socket-ipc
+  []
+  (let [username (.-value (by-id "username"))
+        password (.-value (by-id "password"))]
+    (.send ipc "create-socket" (str username ":" password))))
 
 (defn open-chat-ipc [username]
   (.sendSync ipc "open-chat" (clj->js {:username username})))
@@ -86,10 +109,17 @@
 
 (defn send-message [^js/Event e]
   (.preventDefault e)
+  
   (.play (by-id "messageout"))
-  (let [ message (.-value (js/document.getElementById "text-in"))]
+  (when-let [ message (.-value (js/document.getElementById "text-in"))]
+    (.send ipc "socket-action" (stringify {:method "send-message" 
+                           :params {:to "postmang"
+                                    :message message}}))
     (swap! chat conj {:id (.now js/Date) :ts (now) :author "tanners" :message message})
     (set! (.-value (js/document.getElementById "text-in")) "")))
+
+(defn receive-message [^js/Event e]
+  (println e))
     
 (defn away-effect [username])
 
@@ -123,13 +153,20 @@
   (.play (by-id "dialup"))    
   (js/setTimeout #(set! (.-src (by-id "splash")) "img/dialup-part2.png") 20506)      
   (js/setTimeout #(set! (.-src (by-id "splash")) "img/dialup-part3.png") 23012)      
-  (js/setTimeout #(open-login-window-ipc {}) 25500)      
+  (js/setTimeout #(open-login-window-ipc {}) ;25500
+                 200)      
   (js/setTimeout close-window 26000))      
 
 (defn validate-login [^js/Event e]
-  (open-buddy-list-ipc {:class "buddy-list"
-                        :username (.-value (by-id "username"))})   
-  (close-window))
+  (.preventDefault e)
+  (create-socket-ipc)
+  (if false
+    (do
+      (open-buddy-list-ipc (.-value (by-id "username")))
+      (close-window))
+    (.play (by-id "moo"))))
+
+
   ;; do a http call
   ;; on code 200 render body
   ;; on other code render error 
@@ -156,7 +193,7 @@
         [:div.text-out
          [:div#text-out.inner-text-out
           (for [{:keys [id ts author message]} @chat]
-            ^{:key id} [:div {:id id :on-load scroll-down} ;;(reduce + [author " : " message])
+            ^{:key id} [:div {:id id :on-load scroll-down}
                         [:span.ts (str "[" ts "] ")]  
                         [:span.screen-name author]
                         [:span ": "]
@@ -242,15 +279,16 @@
     [:a {:on-click #((open-chat-ipc username))} username]])    
 
 (defn buddy-group [group-name]
-  (let [filtered-buddies (filter #(= group-name (:group %)) @buddies)
-        online-buddies (filter #(not= "offline" (:status %)) filtered-buddies)]
+  (let [filtered-buddies (filter #(= group-name (% :groupname)) @buddies)
+        online-buddies (filter #(not= "OFFLINE" (% :status)) filtered-buddies)]
     [:details
       [:summary (str group-name " ( " (count online-buddies) "/" (count filtered-buddies) " )")]
       (for [{:keys [username]} online-buddies]
        [buddy username])]))
 
 (defn offline-buddies []
-  (let [filtered-buddies (filter #(= "offline" (:status %)) @buddies)]        
+  (println "buddies" @buddies (count @buddies))
+  (let [filtered-buddies (filter #(= "OFFLINE" (:status %)) @buddies)]        
     [:details.offline
       [:summary (str "Offline ( " (count filtered-buddies) "/" (count @buddies) " )")]
       (for [{:keys [username]} filtered-buddies]
@@ -266,10 +304,9 @@
       [:div.inner-buddy-window
         [:div.buddy-list
           [:div.inner-buddy-list
-            [buddy-group "Buddies"]
-            [buddy-group "Family"]
-            [buddy-group "Co-Workers"]
-            [offline-buddies]]]]]])
+           (for [name (sort (group-list @buddies))]
+             [buddy-group name])
+           [offline-buddies]]]]]])
 
 (defn login-form []
   [:form.login-form {:on-submit validate-login}
@@ -294,31 +331,58 @@
         [:input {:type "image" :id "sign-on" :src "img/sign-on.png"}]]]])
 
 (defn render-buddy-list-window []  
+  (.on ipc "buddy-list"
+       (fn [event, info]
+         (println "buddylist changed: " info)))
+
+  (go (let [blist (<! (http/get 
+                         (str "http://10.0.0.171:3000/aim/buddies-by-user/" 
+                              (.-username metadata))))]
+        (println "got some buddies" blist)
+        (reset! buddies (:body blist))))
+
   (reagent/render
     [:div.window 
       [:div.inner-window
         [buddy-sounds]
-        [window-heading (str (.-username metadata) " 's Buddy List")]
+        [window-heading (str (.-username metadata) "'s Buddy List")]
         [menu-bar ["My AIM" "People" "Help"]]
         [buddy-list-logo]
         [buddy-list]]]
     root))  
-(defn render-chat-window []
+(defn render-chat-window []    
+  
+  (.on ipc (str title)
+       (fn [event, info]
+         (println "new chat message: " info)))
+
   (reagent/render
-    [:div.window
-      [:div.inner-window
-        [window-heading (str title)]
-        [menu-bar ["File" "Edit" "Insert" "People"]]
-        [:div.chat-container 
-          [text-out chat]
-          [text-options]
-          [text-in]
-          [chat-buttons]]
-        [chat-sounds]]]
-    root))
+   [:div.window
+    [:div.inner-window
+     [window-heading (str title)]
+     [menu-bar ["File" "Edit" "Insert" "People"]]
+     [:div.chat-container 
+      [text-out chat]
+      [text-options]
+      [text-in]
+      [chat-buttons]]
+     [chat-sounds]]]
+   root))
+
 (defn render-login-window []
+  (.on ipc "login-success"
+       (fn [event, info]
+         (println "GREAT SUCCESS" info)
+         (open-buddy-list-ipc (.-value (by-id "username")))
+         (close-window)))
+
+  (.on ipc "login-failure"
+       (fn [event, info]
+         (println "rip + moo")
+         (.play (by-id "moo"))))
   (reagent/render
     [:div.window
+     [buddy-sounds]
       [:div.inner-window
         [window-heading "Sign On"]
         [:div.login-container
@@ -335,10 +399,17 @@
     root))
   
 
-(println metadata)
-(println title)
+
+;; (println metadata)
+;; (println title)
 (case (.-class metadata) 
   "dialup-splash" (render-dialup-splash-window)
   "chat-window" (render-chat-window)
   "login-window" (render-login-window)
   "buddy-list" (render-buddy-list-window))
+
+
+
+
+
+
