@@ -9,7 +9,7 @@
 
 (def electron (js/require "electron"))
 (def io (js/require "socket.io-client"))
-(def wsClient (.-client (js/require "websocket")))
+(def wsClient (js/require "ws"))
 (def remote (.-remote electron))
 (def ipc (.-ipcRenderer electron))
 (def title (.-title (.-meta (.-browserWindowOptions (.-webContents (.getCurrentWindow remote))))))
@@ -111,15 +111,27 @@
   (.preventDefault e)
   
   (.play (by-id "messageout"))
-  (when-let [ message (.-value (js/document.getElementById "text-in"))]
-    (.send ipc "socket-action" (stringify {:method "send-message" 
-                           :params {:to "postmang"
-                                    :message message}}))
-    (swap! chat conj {:id (.now js/Date) :ts (now) :author "tanners" :message message})
-    (set! (.-value (js/document.getElementById "text-in")) "")))
+  (let [ message (.-value (js/document.getElementById "text-in"))]
+    (when-not (= message "")
+      (.send ipc "socket-action" 
+             (stringify {:method "send-message" 
+                         :params {:to (.-title metadata)
+                                  :from (.-username metadata)
+                                  :message message}}))
+      (swap! chat conj {:id (.now js/Date) 
+                        :ts (now) 
+                        :author (.-username metadata) 
+                        :message message})
+      (set! (.-value (js/document.getElementById "text-in")) ""))))
 
-(defn receive-message [^js/Event e]
-  (println e))
+(defn receive-message [author message]
+  (println "recieved a message!" author message)
+  (.play (by-id "messagein"))
+  (swap! chat conj
+         {:id (.now js/Date) 
+          :ts (now) 
+          :other-guy author
+          :message message}))
     
 (defn away-effect [username])
 
@@ -192,10 +204,11 @@
       (fn [chat]
         [:div.text-out
          [:div#text-out.inner-text-out
-          (for [{:keys [id ts author message]} @chat]
+          (for [{:keys [id ts author message other-guy]} @chat]
             ^{:key id} [:div {:id id :on-load scroll-down}
                         [:span.ts (str "[" ts "] ")]  
                         [:span.screen-name author]
+                        [:span.other-screen-name other-guy]
                         [:span ": "]
                         [:span#message message]])]])}))
 
@@ -236,9 +249,9 @@
 
 (defn text-in []
  [:div.outer-text-in 
-  [:textarea.text-in {:id "text-in" :on-key-press 
+  [:textarea.text-in {:id "text-in" :on-key-down 
                       (fn [e]
-                        (log (.-key e))
+                        (println (.-key e))
                         (when-not (.-shiftKey e)
                           (log "no shift here")
                           (when (= (.-key e) "Enter")    
@@ -342,19 +355,21 @@
         (reset! buddies (:body blist))))
 
   (reagent/render
-    [:div.window 
-      [:div.inner-window
-        [buddy-sounds]
-        [window-heading (str (.-username metadata) "'s Buddy List")]
-        [menu-bar ["My AIM" "People" "Help"]]
-        [buddy-list-logo]
-        [buddy-list]]]
-    root))  
+   [:div.window 
+    [:div.inner-window
+     [buddy-sounds]
+     [window-heading (str (.-username metadata) "'s Buddy List")]
+     [menu-bar ["My AIM" "People" "Help"]]
+     [buddy-list-logo]
+     [buddy-list]]]
+   root))  
+
 (defn render-chat-window []    
   
-  (.on ipc (str title)
+  (.on ipc (str "chat-" title)
        (fn [event, info]
-         (println "new chat message: " info)))
+         (println "new chat message: " info)
+         (receive-message title info)))
 
   (reagent/render
    [:div.window
@@ -370,6 +385,7 @@
    root))
 
 (defn render-login-window []
+  
   (.on ipc "login-success"
        (fn [event, info]
          (println "GREAT SUCCESS" info)

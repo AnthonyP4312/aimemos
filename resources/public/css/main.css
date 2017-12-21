@@ -141,7 +141,16 @@ body {
 
 .screen-name {
   color: red;
-  font: 14px helvetica;
+  font: 16px helvetica;
+}
+
+.other-screen-name {
+  color: #0000ff;
+  font: 16px helvetica;
+}
+
+.ts {
+  font: 14px consolas;
 }
 
 audio {

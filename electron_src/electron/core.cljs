@@ -9,13 +9,14 @@
 (def browser-window (.-BrowserWindow electron))
 (def crash-reporter (.-crashReporter electron))
 (def ipc            (.-ipcMain electron))
-(def wsClient (.-client (js/require "websocket")))
+(def wsClient (js/require "ws"))
 
 (def buddy-list (atom nil))
 (def dialup-splash (atom nil))
 (def login-window (atom nil))
-(def chat-windows (atom []))
+(def chat-windows (atom {}))
 (def ws (atom nil))
+(def this-user (atom nil))
 
 (enable-console-print!)
 
@@ -27,22 +28,44 @@
 (defn open-chat-window [screen-name]
   (let [chat (browser-window.
               (clj->js {:icon "img/aim.png"
-                        :meta {:class "chat-window" :title screen-name}
+                        :meta {:class "chat-window" 
+                               :title screen-name
+                               :username @this-user}
                         :width 500
                         :height 500
                         :frame false
                         :resizable true
                         :titleBarStyle "hidden"}))]                       
     (.loadURL chat (str "file://" js/__dirname "/public/index.html"))
-    (swap! chat-windows conj chat)))
+    (swap! chat-windows assoc (keyword screen-name) chat)))
+
+(defn send-chat-message
+  [user message]
+  (let [window (@chat-windows (keyword user))]
+    (println "Sending the message back to render" user message window)
+    (.send (.-webContents window) (str "chat-" user) message)))
 
 (defn socket-message
-  [message]
-  (println message))
+  [m]
+  (let [message (js->clj (.parse js/JSON m) :keywordize-keys true)]
+    (if (vector? message)
+      (do ;; Updated buddies
+        (when @buddy-list
+          (.send ipc "buddy-update" message)))
+      (do ;; A Message
+        (println "clj message" message)
+        (println (keyword (:from message)))
+        (println @chat-windows)
+        (if ((keyword (:from message)) @chat-windows) ;; is this chat window open?
+          (send-chat-message (:from message) (:message message))
+          (do 
+            (open-chat-window (:from message))
+            (js/setTimeout 
+             #(send-chat-message (:from message) (:message message)) 500)))))))
 
 (.on ipc "open-buddy-list" 
   (fn [event, user]
-    (println user)
+    (reset! this-user user)
     (new-window! buddy-list (clj->js {:icon "img/aim.png"
                                       :meta {:class "buddy-list"
                                              :username user}
@@ -82,22 +105,24 @@
 (.on ipc "create-socket"
      (fn [event, info]
        (println "Creating a socket!")
-       (let [chan (wsClient.)]
-         (.connect chan "ws://10.0.0.171:3000/ws" nil nil 
-                   (clj->js {:Authorization (str "Basic " (encodeString info))}))
-         (.on chan "connect" (fn [conn]
+       (let [chan (wsClient.
+                   "ws://10.0.0.171:3000/ws" nil
+                   (clj->js {:perMessageDeflate false
+                             :headers
+                             {:Authorization (str "Basic " (encodeString info))}}))]
+         (.on chan "open" (fn [] 
                                (println "connected!")
-                               (.on conn "message" socket-message)
-                               (.on conn "frame" (partial println "thisaframe"))
-                               (.send (.-sender event) "login-success" "nice")       
-                               (reset! ws conn)))
-         (.on chan "connectFailed" #(.send (.-sender event) "login-failure" "rip")))
-       (println "registered all the listeners")))
+                               (.send (.-sender event) "login-success" "nice")))       
+         (.on chan "message" socket-message)
+         (.on chan "frame" (partial println "thisaframe"))
+         (reset! ws chan)
+         (.on chan "unexpected-response" 
+              #(.send (.-sender event) "login-failure" "rip")))))
 
 (.on ipc "socket-action"
      (fn [event, info]
        (print "Im doin the socket thing with " info)
-       (.sendUTF @ws info)))
+       (.send @ws info)))
 
 ; CrashReporter can just be omitted
 (.on app "window-all-closed" #(when-not (= js/process.platform "darwin")

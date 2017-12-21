@@ -6,6 +6,7 @@
     "debug": "^3.1.0",
     "electron": "^1.7.9",
     "socket.io": "^2.0.4",
-    "websocket": "^1.0.25"
+    "websocket": "^1.0.25",
+    "ws": "^3.3.3"
   }
 }
