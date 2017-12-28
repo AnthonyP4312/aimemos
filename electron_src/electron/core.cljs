@@ -27,7 +27,7 @@
 
 (defn open-chat-window [screen-name]
   (let [chat (browser-window.
-              (clj->js {:icon "img/aim.png"
+              (clj->js {:icon (str js/__dirname "/public/img/aim.png")
                         :meta {:class "chat-window" 
                                :title screen-name
                                :username @this-user}
@@ -66,7 +66,7 @@
 (.on ipc "open-buddy-list" 
   (fn [event, user]
     (reset! this-user user)
-    (new-window! buddy-list (clj->js {:icon "img/aim.png"
+    (new-window! buddy-list (clj->js {:icon (str js/__dirname "/public/img/aim.png")
                                       :meta {:class "buddy-list"
                                              :username user}
                                       :frame false
@@ -83,7 +83,7 @@
                                         :titleBarStyle "hidden"
                                         :width 300
                                         :height 500
-                                        :icon "img/aim.png"
+                                        :icon (str js/__dirname "/public/img/aim.png")
                                         :resizable true}))
     (set! (.-returnValue event) "bitch")))
 
@@ -93,7 +93,7 @@
                                          :frame false
                                          :titleBarStyle "hidden"
                                          :width 1000
-                                         :icon "img/aim.png"
+                                         :icon (str js/__dirname "/public/img/aim.png")
                                          :height 475}))
     (set! (.-returnValue event) "bitch")))
 
@@ -106,13 +106,15 @@
      (fn [event, info]
        (println "Creating a socket!")
        (let [chan (wsClient.
-                   "ws://10.0.0.171:3000/ws" nil
+                   "ws://iwannadie.today/ws" nil
                    (clj->js {:perMessageDeflate false
+                             :rejectUnauthorized false
                              :headers
                              {:Authorization (str "Basic " (encodeString info))}}))]
          (.on chan "open" (fn [] 
-                               (println "connected!")
-                               (.send (.-sender event) "login-success" "nice")))       
+                            (println "connected!")
+                            (js/setInterval #(.ping chan) 5000)
+                            (.send (.-sender event) "login-success" "nice")))       
          (.on chan "message" socket-message)
          (.on chan "frame" (partial println "thisaframe"))
          (reset! ws chan)
@@ -129,9 +131,12 @@
                                 (.quit app)))                        
 
 (.on app "ready" #(new-window! login-window {:meta {:class "dialup-splash"}
-                                              :frame false
-                                              :titleBarStyle "hidden"
-                                              :resizable false
-                                              :width 910
-                                              :icon "img/aim.png"
-                                              :height 432}))
+                                             :frame false
+                                             :titleBarStyle "hidden"
+                                             :resizable false
+                                             :width 910
+                                             :icon (str js/__dirname "/public/img/aim.png")
+                                             :height 432}))
+
+
+
