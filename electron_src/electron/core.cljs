@@ -28,14 +28,14 @@
 (defn open-chat-window [screen-name]
   (let [chat (browser-window.
               (clj->js {:icon (str js/__dirname "/public/img/aim.png")
-                        :meta {:class "chat-window" 
+                        :meta {:class "chat-window"
                                :title screen-name
                                :username @this-user}
                         :width 500
                         :height 500
                         :frame false
                         :resizable true
-                        :titleBarStyle "hidden"}))]                       
+                        :titleBarStyle "hidden"}))]
     (.loadURL chat (str "file://" js/__dirname "/public/index.html"))
     (swap! chat-windows assoc (keyword screen-name) chat)))
 
@@ -58,12 +58,12 @@
         (println @chat-windows)
         (if ((keyword (:from message)) @chat-windows) ;; is this chat window open?
           (send-chat-message (:from message) (:message message))
-          (do 
+          (do
             (open-chat-window (:from message))
-            (js/setTimeout 
+            (js/setTimeout
              #(send-chat-message (:from message) (:message message)) 500)))))))
 
-(.on ipc "open-buddy-list" 
+(.on ipc "open-buddy-list"
   (fn [event, user]
     (reset! this-user user)
     (new-window! buddy-list (clj->js {:icon (str js/__dirname "/public/img/aim.png")
@@ -73,10 +73,10 @@
                                       :titleBarStyle "hidden"
                                       :width 300
                                       :height 700}))
-    (set! (.-returnValue event) "bitch")))
+    (set! (.-returnValue event) "buddy list opened")))
 
-(.on ipc "open-login-window" 
-     
+(.on ipc "open-login-window"
+
   (fn [event, meta]
     (new-window! login-window (clj->js {:meta {:class "login-window"}
                                         :frame false
@@ -87,7 +87,7 @@
                                         :resizable true}))
     (set! (.-returnValue event) "bitch")))
 
-(.on ipc "open-dialup-splash" 
+(.on ipc "open-dialup-splash"
   (fn [event, meta]
     (new-window! dialup-splash (clj->js {:meta meta
                                          :frame false
@@ -97,28 +97,28 @@
                                          :height 475}))
     (set! (.-returnValue event) "bitch")))
 
-(.on ipc "open-chat" 
+(.on ipc "open-chat"
   (fn [event, info]
     (open-chat-window (.-username info))
-    (set! (.-returnValue event) "bitch")))
-                 
+    (set! (.-returnValue event) "oh boy")))
+
 (.on ipc "create-socket"
      (fn [event, info]
        (println "Creating a socket!")
        (let [chan (wsClient.
-                   "ws://iwannadie.today/ws" nil
+                   "ws://69.164.212.77:80/ws" nil
                    (clj->js {:perMessageDeflate false
                              :rejectUnauthorized false
                              :headers
                              {:Authorization (str "Basic " (encodeString info))}}))]
-         (.on chan "open" (fn [] 
+         (.on chan "open" (fn []
                             (println "connected!")
                             (js/setInterval #(.ping chan) 5000)
-                            (.send (.-sender event) "login-success" "nice")))       
+                            (.send (.-sender event) "login-success" "nice")))
          (.on chan "message" socket-message)
          (.on chan "frame" (partial println "thisaframe"))
          (reset! ws chan)
-         (.on chan "unexpected-response" 
+         (.on chan "unexpected-response"
               #(.send (.-sender event) "login-failure" "rip")))))
 
 (.on ipc "socket-action"
@@ -128,7 +128,7 @@
 
 ; CrashReporter can just be omitted
 (.on app "window-all-closed" #(when-not (= js/process.platform "darwin")
-                                (.quit app)))                        
+                                (.quit app)))
 
 (.on app "ready" #(new-window! login-window {:meta {:class "dialup-splash"}
                                              :frame false
@@ -137,6 +137,3 @@
                                              :width 910
                                              :icon (str js/__dirname "/public/img/aim.png")
                                              :height 432}))
-
-
-
